@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>Covid 19 Tracker By Anirudh Mk</title>
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.css'><link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<div id="app">
+			<notify
+				:show="getNotifyDetails.show"
+				:type="getNotifyDetails.type"
+				:message="getNotifyDetails.message"
+			></notify>
+
+			<div class="main" :data-show-map="show_countries_list">
+				<div class="sidebar">
+					<div class="top-nav">
+						<div class="current-location">
+							<div class="flag-wrapper" v-if="getCurrentLocation !== 'WO'">
+								<flag :iso="getCurrentLocation.toLowerCase()"></flag>
+							</div>
+							<div class="flag-wrapper world" v-if="getCurrentLocation === 'WO'">
+								<i class="flag fas fa-globe"></i>
+							</div>
+
+							<div class="location-title">{{ getCountriesList[getCurrentLocation] }}</div>
+						</div>
+					</div>
+					<div class="cases-nav">
+						<div
+							class="case-type confirmed"
+							@click="changeCaseType('confirmed')"
+							:class="{ active: getDisplayedCasesType == 'confirmed' }"
+						>
+							<div class="case-type-icon">
+								<i class="fas fa-virus"></i>
+							</div>
+							<div class="case-type-inner">
+								<div class="case-title">Confiremd</div>
+								<div class="case-count">{{ confirmedCount }}</div>
+							</div>
+						</div>
+						<div
+							class="case-type recovered"
+							@click="changeCaseType('recovered')"
+							:class="{ active: getDisplayedCasesType == 'recovered' }"
+						>
+							<div class="case-type-icon">
+								<i class="fas fa-first-aid"></i>
+							</div>
+							<div class="case-type-inner">
+								<div class="case-title">Recovered</div>
+								<div class="case-count">{{ recoveredCount }}</div>
+							</div>
+						</div>
+						<div
+							class="case-type deaths"
+							@click="changeCaseType('deaths')"
+							:class="{ active: getDisplayedCasesType == 'deaths' }"
+						>
+							<div class="case-type-icon">
+								<i class="fas fa-biohazard"></i>
+							</div>
+							<div class="case-type-inner">
+								<div class="case-title">Deaths</div>
+								<div class="case-count">{{ deathsCount }}</div>
+							</div>
+						</div>
+					</div>
+					<div class="bottom-nav">
+						<div class="fill-screen" @click="is_full_screen = !is_full_screen">
+							<i class="fas fa-expand" v-if="is_full_screen == false"></i>
+							<i class="fas fa-compress" v-if="is_full_screen == true"></i>
+						</div>
+						<div
+							class="locations-list"
+							:class="{ active: show_countries_list == true }"
+							@click="show_countries_list = !show_countries_list"
+						>
+							<i class="fas fa-map-marked-alt"></i>
+						</div>
+					</div>
+					<div class="info-nav">
+						<div
+							>
+							
+						</div>
+
+						<a target="_blank" href="https://codepen.io/Bestcoder123MK"> <i class="fab fa-codepen"></i></a>
+
+									</div>
+
+					<div class="copyright-wrapper" v-if="show_copyright">
+						<a target="_blank" :href="link" v-for="( link, text)  in copyright_data">{{text}}</a>
+					</div>
+				</div>
+
+				<CountriesList :class="{ active: show_countries_list == true }"></CountriesList>
+
+				<div class="content-wrapper">
+					<WorldMap></WorldMap>
+
+					<div class="series-container">
+						<series></series>
+					</div>
+				</div>
+			</div>
+			<location-tooltip></location-tooltip>
+		</div>
+
+		<!-- Countries list -->
+		<template id="countries-list-template">
+			<div id="countries-list-wrapper">
+				<div class="countries-search-wrapper">
+					<input
+						type="text"
+						class="search-countries"
+						placeholder="Search Countries ..."
+						@input="filterCountries"
+					/>
+				</div>
+				<div class="countries-list-container">
+					<div class="countries-list" :class="{'is-loading': getLocationLoading != false}">
+						<div
+							class="country-wrapper"
+							:class="{ active: key == getCurrentLocation, loading: getLocationLoading == key }"
+							v-for="(country, key) in filterCountriesList"
+							:key="`country-${key}`"
+							:data-loading="!is_loading[key] || is_loading[key] == 'undefined' ? 'no' : 'yes'"
+							@click="selectCountry(key)"
+						>
+							<loader-bar
+								v-if="getLocationLoading == key"
+								:loading-indeterminant="true"
+							></loader-bar>
+							<div class="flag-wrapper" v-if="key.toLowerCase() !== 'wo'">
+								<flag :iso="key.toLowerCase()"></flag>
+							</div>
+							<div class="flag-wrapper world" v-if="key.toLowerCase() === 'wo'">
+								<i class="flag fas fa-globe"></i>
+							</div>
+							<div class="country-content">
+								<div class="country-name" :title="country.name">{{ country.name }}</div>
+								<div class="country-count-diff" :class="country.diff.type">
+									<span class="type-operator">
+										<span class="extra" v-if="country.diff.type == 'extra'">+</span>
+										<span class="extra" v-if="country.diff.type == 'less'">-</span>
+									</span>
+									<span class="diff-count">{{ country.diff.value.toLocaleString('en-US') }}</span>
+								</div>
+								<div class="country-count">{{ country.value.toLocaleString('en-US') }}</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</template>
+
+		<!-- Notify Template -->
+		<template id="notify-template">
+			<transition name="fadeslide">
+				<div id="notification" :class="type" v-if="show_notify">
+					<div class="icon">
+						<i class="fas fa-exclamation-triangle" v-if="type == 'error'"></i>
+						<i class="fas fa-check-circle" v-if="type == 'success'"></i>
+					</div>
+					<div class="text">{{message}}</div>
+				</div>
+			</transition>
+		</template>
+
+		<!-- Flag Template -->
+		<template id="flag-template">
+			<span class="flag">
+				<img :src="flag" />
+			</span>
+		</template>
+
+		<!-- Loader Bar Template -->
+		<template id="loader-bar-template">
+			<div class="loader-wrapper">
+				<div class="loader-bar" :class="{ indeterminant: loadingIndeterminant == true }">
+					<div class="loader-bar-loaded" :style="{ width: `${loadedPercentage}%` }"></div>
+				</div>
+				<div class="loader-text">{{ loadingText }}</div>
+			</div>
+		</template>
+
+		<!-- Worldmap Template -->
+		<template id="worldmap-template">
+			<div class="map-countries-container">
+				<loader-bar
+					v-if="loading == true"
+					:loading-text="loading_text"
+					:loaded-percentage="loaded_percentage"
+				></loader-bar>
+
+				<loader-bar
+					v-if="getLocationLoading != false"
+					loading-text="Loading Location Data"
+					:loading-indeterminant="true"
+				></loader-bar>
+
+				<div
+					class="map-container"
+					:data-status="getCurrentLocation != 'WO' ? 'single-location' : 'world'"
+					ref="world_map_container"
+					:style="getMapStyle"
+					@mouseleave="stopRotateMap"
+					@mousemove="rotateMap"
+				>
+					<div
+						class="reset-map"
+						:class="{ show: getCurrentLocation != 'WO' }"
+						@click="resetLocation()"
+					>
+						<i class="fas fa-home"></i>
+					</div>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						version="1.1"
+						ref="world_map"
+						:view-box.camel="viewbox"
+						:class="{loading: getLocationLoading != false}"
+					>
+						<g
+							v-for="(data, key) in getWorlMapWithColors"
+							:id="key"
+							:key="key"
+							:fill="data.color"
+							:ref="`location-${key}`"
+							stroke="white"
+							:data-count="data.value"
+							@click="selectLocation(key)"
+							@mouseenter="handleMoustEnter($event, key, data.value)"
+							@mouseleave="handleMoustOut"
+							@mousemove="handleMouseMove"
+							:class="{ active: key == getCurrentLocation, 'no-select': typeof getDayCaseByType[key] == 'undefined' }"
+							:data-status="getCurrentLocation == key ? 'selected' : ''"
+						>
+							<path
+								:d="data.path"
+								:key="`path-${key}`"
+								stroke-width="0.3"
+								stroke-opacity="0.5"
+							></path>
+						</g>
+					</svg>
+				</div>
+			</div>
+		</template>
+
+		<!-- Location details tooltip -->
+		<template id="location-tooltip-template">
+			<div id="location-tooltip" role="tooltip" ref="tooltip" :style="getTooltipStyle">
+				<div class="tooltip-inner">
+					<div class="tooltip-title">{{ this.getTooltipData.title }}</div>
+					<div class="tooltip-content" v-if="'count' in this.getTooltipData">
+						<div class="cases-type">
+							<span>{{ this.getTooltipData.count }}</span>
+							<span>{{ this.getTooltipData.type }}</span>
+						</div>
+						<div class="cases-diff">
+							<span>{{ this.getTooltipData.diff }}</span>
+							<span>Daily {{ this.getTooltipData.difftext }}</span>
+						</div>
+						<div class="cases-percentage">
+							<span>{{ this.getTooltipData.percentage }}%</span>
+							<span>Daily change</span>
+						</div>
+					</div>
+					<div v-else>No data available</div>
+				</div>
+				<div class="arrow" data-popper-arrow></div>
+			</div>
+		</template>
+
+		<!-- Series Tempmate -->
+		<template id="series-template">
+			<div class="series-data-wrapper">
+				<loader-bar
+					v-if="series_loading == true"
+					:loading-indeterminant="true"
+					loading-text="Loading Series"
+				></loader-bar>
+				<div class="series-data-options" v-if="series_loading == false">
+					<div class="bar-line-options">
+						<span class="bar" @click="chart_type = 'bar'" :class="{ active: chart_type == 'bar' }"
+							>Bar</span
+						>
+						<span
+							class="line"
+							@click="chart_type = 'line'"
+							:class="{ active: chart_type == 'line' }"
+							>Line</span
+						>
+					</div>
+					<div class="daily-weekly">
+						<span
+							class="daily"
+							@click="series_type = 'daily'"
+							:class="{ active: series_type == 'daily' }"
+							>Daily</span
+						>
+						<span
+							class="weekly"
+							@click="series_type = 'weekly'"
+							:class="{ active: series_type == 'weekly' }"
+							>Weekly</span
+						>
+					</div>
+					<div class="chart-data-representation">
+						<span
+							class="change"
+							@click="series_representation = 'change'"
+							:class="{ active: series_representation == 'change' }"
+							>Change</span
+						>
+						<span
+							class="cumulative"
+							@click="series_representation = 'cumulative'"
+							:class="{ active: series_representation == 'cumulative' }"
+							>Cumulative</span
+						>
+						<span
+							class="log"
+							@click="series_representation = 'log'"
+							:class="{ active: series_representation == 'log' }"
+							>Log</span
+						>
+					</div>
+				</div>
+				<div class="series-data" v-show="series_loading == false">
+					<canvas ref="chart"></canvas>
+				</div>
+				<div id="chartjs-tooltip">
+					<div class="title"></div>
+					<div class="count-wrapper">
+						<div class="count-total-type"></div>
+						<div class="count-total-number"></div>
+					</div>
+				</div>
+			</div>
+		</template>
+<!-- partial -->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/vuex/3.6.0/vuex.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/gsap/3.6.0/gsap.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.min.js'></script><script  src="./script.js"></script>
+
+</body>
+</html>
